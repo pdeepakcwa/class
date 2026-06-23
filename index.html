@@ -130,7 +130,7 @@
         lucide.createIcons();
 
         // Security Configuration
-        const TEACHER_PIN = "999999"; // 🔑 Change this to your preferred classroom password!
+        const TEACHER_PIN = "999999"; 
 
         const canvasElement = document.getElementById('classroom-canvas');
         canvasElement.width = canvasElement.parentElement.clientWidth;
@@ -139,7 +139,6 @@
         canvas.freeDrawingBrush.width = 3;
         canvas.freeDrawingBrush.color = '#10b981';
 
-        // Block flag to prevent infinite network echo looping
         let isReceivingNetworkUpdate = false; 
 
         function switchTab(tabId) {
@@ -219,6 +218,22 @@
             fb.classList.add(isCorrect ? 'text-emerald-400' : 'text-rose-400');
         }
 
+        // Global Cross-Network Broker Configuration (Bypasses NAT Firewalls)
+        const PEER_CONFIG = {
+            host: '0.peerjs.com',
+            port: 443,
+            secure: true,
+            config: {
+                'iceServers': [
+                    { url: 'stun:stun.l.google.com:19302' },
+                    { url: 'stun:stun1.l.google.com:19302' },
+                    { url: 'stun:stun2.l.google.com:19302' },
+                    { url: 'stun:stun3.l.google.com:19302' },
+                    { url: 'stun:stun4.l.google.com:19302' }
+                ]
+            }
+        };
+
         function handlePDFUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -243,9 +258,8 @@
             fileReader.readAsArrayBuffer(file);
         }
 
-        // Network Setup & Routing Gate
         let peer = null;
-        let connections = []; // Array to track all connected nodes
+        let connections = []; 
         let isTeacher = false;
         let localStream = null;
         let currentPeerId = null;
@@ -271,7 +285,7 @@
             document.getElementById('teacher-admin-controls').classList.remove('hidden');
             
             const generatedRoomId = 'botany-' + Math.random().toString(36).substring(2, 7);
-            peer = new Peer(generatedRoomId);
+            peer = new Peer(generatedRoomId, PEER_CONFIG);
             
             peer.on('open', (id) => {
                 document.getElementById('room-display').innerText = `ID: ${id}`;
@@ -284,7 +298,6 @@
                 
                 setupConnectionListeners(connection);
                 
-                // Safe transmission delay once student connection completes handshake
                 connection.on('open', () => {
                     setTimeout(() => { 
                         connection.send({ type: 'sync-canvas', data: JSON.stringify(canvas) }); 
@@ -301,14 +314,13 @@
             document.getElementById('role-badge').className = "font-bold uppercase tracking-wider text-teal-400";
             if(roomId) document.getElementById('setup-box').classList.add('hidden');
             
-            peer = new Peer();
+            peer = new Peer(PEER_CONFIG);
             peer.on('open', () => {
                 if(roomId) {
                     document.getElementById('room-display').innerText = `Linked: ${roomId}`;
                     const conn = peer.connect(roomId);
                     currentPeerId = roomId;
                     
-                    // Wait for connection pipeline to open before creating payload interceptors
                     conn.on('open', () => {
                         connections.push(conn);
                         setupConnectionListeners(conn);
@@ -351,7 +363,7 @@
             }).catch(err => alert("Camera permission is required."));
         }
 
-        // Targeted canvas state listeners
+        // Canvas state event loops
         canvas.on('object:added', (e) => { 
             if (isReceivingNetworkUpdate) return;
             broadcastData({ type: 'sync-canvas', data: JSON.stringify(canvas) });
@@ -364,7 +376,6 @@
             if (isReceivingNetworkUpdate) return;
             broadcastData({ type: 'sync-canvas', data: JSON.stringify(canvas) });
         });
-        // Captures freehand brush drawing stroke completion updates
         canvas.on('path:created', () => {
             if (isReceivingNetworkUpdate) return;
             broadcastData({ type: 'sync-canvas', data: JSON.stringify(canvas) });
